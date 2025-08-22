@@ -1,0 +1,199 @@
+name: Release package
+on:
+  workflow_dispatch:
+    inputs:
+      package_name:
+        description: "Name of the package to release"
+        type: string
+        required: false
+      revision:
+        description: "SVN revision associated with the package version to release"
+        type: number
+        required: false
+      version:
+        description: "Version of the package to release"
+        type: string
+        required: false
+      release_json:
+        description: "JSON object containing information on the packages to be released (ordered by 'package_name')"
+        type: string
+        required: false
+env:
+  RELEASE_WORKFLOW: release-package.yaml
+
+jobs:
+  inputs-sanity-check:
+    # This workflow accepts either a single 'release_json' input, or the three 
+    # 'package_name', 'revision' and 'version' inputs (without 'release_json').
+    # Make sure that the inputs are valid before proceeding.
+    name: Inputs sanity check
+    runs-on: ubuntu-latest
+    outputs:
+      package_name: ${{ steps.check-inputs.outputs.package_name }}
+      revision: ${{ steps.check-inputs.outputs.revision }}
+      version: ${{ steps.check-inputs.outputs.version }}
+      release_json: ${{ steps.check-inputs.outputs.release_json }}
+    steps:
+      - name: Check inputs
+        id: check-inputs
+        run: |
+          if [ -n '${{ inputs.release_json }}' ]; then
+            # If release_json is not empty, then all the other inputs must be empty.
+            if (
+                [ -n '${{ inputs.package_name }}' ] \
+                || [ -n '${{ inputs.revision }}' ] \
+                || [ -n '${{ inputs.version }}' ] \
+            ); then
+              echo "::error:: 'release_json' cannot be specified together with any among 'package_name', 'revision' or 'version'." \
+                "Either a single 'release_json' input or the three 'package_name', 'revision' and 'version' inputs together must be specified."
+              exit 1
+            fi
+            # Take the release information from the first object in release_json array
+            package_name=$(jq -r '.[0].package_name' <<< '${{ inputs.release_json }}')
+            revision=$(jq -r '.[0].revision' <<< '${{ inputs.release_json }}')
+            version=$(jq -r '.[0].version' <<< '${{ inputs.release_json }}')
+            # Remove the first object from the release_json array
+            release_json=$(jq -c '.[1:]' <<< '${{ inputs.release_json }}')
+          elif ( # If release_json is empty, then all the other inputs must be non-empty.
+                [ -z '${{ inputs.package_name }}' ] \
+                || [ -z '${{ inputs.revision }}' ] \
+                || [ -z '${{ inputs.version }}' ] \
+          ); then
+            echo "::error:: Not enough input arguments specified. Either a single 'release_json' input or the three 'package_name', 'revision' and 'version' inputs together must be specified."
+            exit 1
+          else
+            package_name='${{ inputs.package_name }}'
+            revision='${{ inputs.revision }}'
+            version='${{ inputs.version }}'
+            release_json='${{ inputs.release_json }}'
+          fi
+          echo "package_name=$package_name" >> $GITHUB_OUTPUT
+          echo "revision=$revision" >> $GITHUB_OUTPUT
+          echo "version=$version" >> $GITHUB_OUTPUT
+          echo "release_json=$release_json" >> $GITHUB_OUTPUT
+          echo "::notice::Package to be released in this workflow: ${package_name}-${version}"
+          if [ $release_json == '' ] || [ $release_json == '[]' ]; then
+            echo "::notice::No other packages queued for release."
+          else
+            echo "::notice::Packages queued for release: $release_json"
+          fi
+            
+  set-tag-name:
+    name: Set tag name and release name
+    runs-on: ubuntu-latest
+    needs: inputs-sanity-check
+    outputs:
+      tag_name: ${{ steps.set-tag.outputs.tag_name }}
+      release_name: ${{ steps.set-release.outputs.release_name }}
+    steps:
+      - name: Set tag name
+        id: set-tag
+        run: |
+          echo "tag_name=${{ needs.inputs-sanity-check.outputs.package_name }}-${{ needs.inputs-sanity-check.outputs.version }}" >> $GITHUB_OUTPUT
+      - name: Set release name
+        id: set-release
+        run: |
+          echo "release_name=${{ needs.inputs-sanity-check.outputs.package_name }} ${{ needs.inputs-sanity-check.outputs.version }}" >> $GITHUB_OUTPUT
+
+  release-conda-package:
+    name: Create conda package
+    runs-on: ubuntu-latest
+    needs: [inputs-sanity-check, set-tag-name]
+    env:
+      REVISION: ${{ needs.inputs-sanity-check.outputs.revision }} # Needed as an env variable for the conda recipe
+      VERSION: ${{ needs.inputs-sanity-check.outputs.version }} # Needed as an env variable for the conda recipe
+      GIT_HASH: ${{ github.sha }} # Needed as an env variable for the conda recipe
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Cache SVN auth for MOSRS
+        uses: access-nri/actions/.github/actions/cache-svn-auth@main
+        with: 
+          username: '${{ secrets.MOSRS_USERNAME }}'
+          password: '${{ secrets.MOSRS_PASSWORD }}'
+          realm: '<https://code.metoffice.gov.uk:443> Met Office Code'
+      
+      - name: Set up micromamba
+        uses: mamba-org/setup-micromamba@b09ef9b599704322748535812ca03efb2625677b #v2.0.5
+        with:
+          environment-file: env-build.yml
+
+      - name: Build and upload conda package
+        id: conda-build
+        uses: ACCESS-NRI/action-build-and-upload-conda-packages@v3.0.0
+        with:
+          meta_yaml_dir: packages/${{ needs.inputs-sanity-check.outputs.package_name }}/recipe
+          user: ${{ secrets.ANACONDA_USERNAME }}
+          token: ${{ secrets.ANACONDA_TOKEN }}
+          conda_build_args: -c accessnri -c conda-forge -c nodefaults
+    
+      - name: Create tag
+        id: create-tag
+        run: |
+          # Create tag
+          git tag '${{ needs.set-tag-name.outputs.tag_name }}' ${{ github.sha }}
+          git push origin tag '${{ needs.set-tag-name.outputs.tag_name }}'
+
+      - name: Create Release
+        uses: softprops/action-gh-release@72f2c25fcb47643c292f7107632f7a47c1df5cd8 #v2.3.2
+        with:
+          tag_name: '${{ needs.set-tag-name.outputs.tag_name }}'
+          name: '${{ needs.set-tag-name.outputs.release_name }}'
+          generate_release_notes: false
+          fail_on_unmatched_files: true
+          files: |-
+            ${{ steps.conda-build.outputs.paths }}
+  
+  release-queued-packages:
+    name: Release queued packages
+    runs-on: ubuntu-latest
+    needs: [inputs-sanity-check, release-conda-package]
+    if: ${{ needs.inputs-sanity-check.outputs.release_json != '' && needs.inputs-sanity-check.outputs.release_json != '[]' }}
+    env:
+      GH_TOKEN: ${{github.token}}
+    permissions:
+      actions: write
+    steps:
+      - name: Release packages
+        run: |
+          echo "Releasing packages ..."
+          options='--field release_json=${{ needs.inputs-sanity-check.outputs.release_json }} --repo ${{ github.repository }}'
+          echo "Running '${{ env.RELEASE_WORKFLOW }}' workflow with the following options: '$options'"
+          gh workflow run ${{ env.RELEASE_WORKFLOW }} $options
+          # We wait for the GitHub database to be updated with the latest triggered run
+          # and then we get the its URL
+          sleep 2 
+          run_url=$(gh run list --workflow ${{ env.RELEASE_WORKFLOW }} --limit 1 --json url --jq '.[0].url' --repo ${{ github.repository }})
+          echo "::notice::Releasing the following packages: ${{ needs.inputs-sanity-check.outputs.release_json }}. Release workflow run: $run_url"
+
+  cleanup-on-failure:
+    name: Cleanup on failure
+    runs-on: ubuntu-latest
+    needs: [set-tag-name, release-conda-package]
+    # Run this job if any of the previous jobs failed (and don't skip if any of the needed jobs is skipped)
+    if: ${{ ( always() && failure() ) || cancelled() }}
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-tags: true
+      
+      # Delete newly created tag
+      - name: Cleanup tag
+        run: |
+          if git rev-parse '${{ needs.set-tag-name.outputs.tag_name }}' &>/dev/null; then
+              git push origin ':${{ needs.set-tag-name.outputs.tag_name }}'
+              echo "A job in the current workflow failed. Tag '${{ needs.set-tag-name.outputs.tag_name }}' was deleted."
+          fi
+      
+      # Delete newly created GitHub release
+      - name: Cleanup GitHub release
+        run: |
+           gh release delete '${{ needs.set-tag-name.outputs.tag_name }}'

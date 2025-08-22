@@ -1,0 +1,29 @@
+{% set name = "shumlib" %}
+
+package:
+  name: "{{ name|lower }}"
+  version: '{{ environ["VERSION"] }}'
+
+source:
+  svn_url: https://code.metoffice.gov.uk/svn/utils/shumlib/trunk
+  svn_rev: {{ environ["REVISION"] }}
+
+build:
+  number: 0
+  skip: true # [not linux-64]
+
+requirements:
+  build:
+    - {{ compiler('c') }}
+    - {{ compiler('fortran') }}
+    - binutils
+    - make
+    - sed
+
+about:
+  home: https://code.metoffice.gov.uk/trac/utils/shumlib
+  license: BSD
+  license_file: doc/README.rst
+  summary: Unified Model Shared Libraries
+  extra:
+    git_hash: {{ environ["GIT_HASH"] }}

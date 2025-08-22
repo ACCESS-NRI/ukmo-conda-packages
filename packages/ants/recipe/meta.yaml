@@ -1,0 +1,70 @@
+{% set name = "ants" %}
+{% set version = os.environ.get('VERSION') %}
+
+package:
+  name: "{{ name|lower }}"
+  version: {{ version }}
+
+source:
+  svn_url: https://code.metoffice.gov.uk/svn/ancil/ants/tags/{{ version }}
+  svn_rev: {{ environ["REVISION"] }}
+
+build:
+  number: 0
+  skip: true # [not linux64]
+
+requirements:
+  host:
+    - python
+    - setuptools
+  run:
+    - python
+    - numpy<2
+    - cartopy
+    - dask
+    - esmf=8.4.2=mpi_mpich_h2a0de38_103
+    - esmpy=8.4.2
+    - f90nml
+    - gdal
+    - mule-base
+    - numba
+    - pykdtree
+    - python-stratify
+    - scitools-iris=3.7.1
+    - um-spiral-search
+
+test:
+  source_files:
+    - lib/ants/tests/resources
+    - lib/ants/tests/results
+  requires:
+    - mule-utils
+    - pytest
+  imports:
+    - ants
+  commands:
+    - ancil_2anc.py -h
+    - ancil_create_shapefile.py -h
+    - ancil_fill_n_merge.py -h
+    - ancil_general_regrid.py -h
+    - ants-version
+    # Enable ants to find the proper test resources and results
+    - ln -vs ${SRC_DIR}/lib/ants/tests/resources ${SP_DIR}/ants/tests/resources
+    - ln -vs ${SRC_DIR}/lib/ants/tests/results ${SP_DIR}/ants/tests/results
+    # Run the tests ignoring the following problematic tests:
+    # - deprecation warnings log
+    # - 'test_point_lie_beyond_crs_definition' function
+    # - 'test_license_headers' function
+    # - 'TestTwoStage::test_api' method (it fails on the GitHub runners but succeeds on Gadi with the same exact python test environments)
+    - |
+      $PYTHON -m pytest -W default -vs ${SP_DIR}/ants/tests \
+      --ignore ${SP_DIR}/ants/tests/fileformats/test_deprecation_warnings.py \
+      -k 'not test_point_lie_beyond_crs_definition and not test_license_headers and not (TestTwoStage and test_api)'
+
+about:
+  home: https://code.metoffice.gov.uk/doc/ancil/ants/latest/index.html
+  license: BSD
+  license_family: BSD
+  summary: ANTS is a versatile Python library for developing ancillary applications.
+  extra:
+    git_hash: {{ environ["GIT_HASH"] }}

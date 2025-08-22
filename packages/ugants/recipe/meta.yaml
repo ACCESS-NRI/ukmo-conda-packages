@@ -1,0 +1,54 @@
+{% set name = "ugants" %}
+{% set version = os.environ.get('VERSION') %}
+
+package:
+  name: "{{ name|lower }}"
+  version: {{ version }}
+
+source:
+  svn_url: https://code.metoffice.gov.uk/svn/ancil/ug-ants/tags/{{ version }}
+  svn_rev: {{ environ["REVISION"] }}
+
+build:
+  number: 0
+  skip: true # [not linux64]
+
+requirements:
+  host:
+    - python
+    - setuptools
+  run:
+    - python
+    - numpy<2
+    - dask<=2025.3.0
+    - esmf=8.4.2=mpi_mpich_h2a0de38_103
+    - esmpy=8.4.2
+    - geovista
+    - importlib-metadata=7.1.0
+    - iris-esmf-regrid=0.9.0
+    - pykdtree
+    - scitools-iris=3.9
+
+test:
+  source_files:
+    - lib/ugants/tests/resources
+  requires:
+    - pytest
+    - filelock
+    - iris-sample-data
+  imports:
+    - ugants
+  commands:
+    - ug-ants-version
+    # Enable ugants to find the proper test resources
+    - ln -vs ${SRC_DIR}/lib/ugants/tests/resources ${SP_DIR}/ugants/tests/resources
+    # Test ugants
+    - $PYTHON -m pytest ${SP_DIR}/ugants/tests -W default
+
+about:
+  home: https://code.metoffice.gov.uk/doc/ancil/ug-ants/latest/contributing.html
+  license: BSD
+  license_family: BSD
+  summary: UG-ANTS is a Python library to provide the capabilities to developing ancillary files on unstructured grids.
+  extra:
+    git_hash: {{ environ["GIT_HASH"] }}

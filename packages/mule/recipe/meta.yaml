@@ -1,0 +1,193 @@
+{% set name = "mule" %}
+
+package:
+  name: "{{ name|lower }}"
+  version: {{ environ["VERSION"] }}
+
+source:
+  svn_url: https://code.metoffice.gov.uk/svn/um/mule/trunk
+  svn_rev: {{ environ["REVISION"] }}
+  patches:
+    - um_ppibm_setup.patch
+    - mule_utils_select.patch
+
+build:
+  number: 0 # [linux64]
+  skip: true # [not linux64]
+
+requirements:
+  build:
+    - {{ compiler('c') }}
+  host:
+    - python
+    - pip
+    - numpy
+    - shumlib
+    - setuptools
+
+outputs:
+  - name: um-spiral-search
+    script: build_um_spiral_search.sh
+    build:
+      skip: true # [not linux64]
+    requirements:
+      build:
+        - {{ compiler('c') }}
+      host:
+        - python
+        - pip
+        - numpy
+        - shumlib
+        - setuptools
+      run:
+        - python
+        - numpy
+        - shumlib
+    test:
+      imports:
+        - um_spiral_search
+      commands:
+        - $PYTHON -m unittest discover -vs ${SP_DIR}/um_spiral_search/tests
+    about:
+      summary: Python extension from the SHUMlib spiral search library.
+
+  - name: um-packing
+    script: build_um_packing.sh
+    build:
+      skip: true # [not linux64]
+    requirements:
+      build:
+        - {{ compiler('c') }}
+      host:
+        - python
+        - pip
+        - numpy
+        - shumlib
+        - setuptools
+      run:
+        - python
+        - numpy
+        - shumlib
+    test:
+      requires:
+        - six
+      imports:
+        - um_packing
+      commands:
+        - $PYTHON -m unittest discover -vs ${SP_DIR}/um_packing/tests
+    about:
+      summary: Python extension from the SHUMlib packing library.
+  
+  - name: mule-base
+    script: build_mule_base.sh
+    build:
+      skip: true # [not linux64]
+    requirements:
+      host:
+        - python
+        - pip
+        - numpy
+        - setuptools
+      run:
+        - python
+        - numpy
+        - {{ pin_subpackage('um-packing', exact=True) }}
+    test:
+      requires:
+        - six
+      imports:
+        - mule
+      commands:
+        - $PYTHON -m unittest discover -vs ${SP_DIR}/mule/tests
+    about:
+      summary: Unified Model Fields File interface.
+  
+  - name: um-ppibm
+    script: build_um_ppibm.sh
+    build:
+      skip: true # [not linux64]
+    requirements:
+      build:
+        - {{ compiler('c') }}
+      host:
+        - python
+        - pip
+        - numpy
+        - shumlib
+        - setuptools
+      run:
+        - python
+        - numpy
+        - shumlib
+        - six
+        - {{ pin_subpackage('mule-base', exact=True) }}
+    test:
+      imports:
+        - um_ppibm
+    about:
+      summary: |
+        Python extension Python extension for a limited subset of the functionality in the 
+        SHUMlib data_conv library, which is optionally used by the mule-convpp utility.
+
+  - name: mule-utils
+    script: build_mule_utils.sh
+    build:
+      skip: true # [not linux64]
+    requirements:
+      host:
+        - python
+        - pip
+        - numpy
+        - setuptools
+      run:
+        - python
+        - numpy
+        - pillow
+        - six
+        - {{ pin_subpackage('mule-base', exact=True) }}
+        - {{ pin_subpackage('um-ppibm', exact=True) }}
+    test:
+      imports:
+        - um_utils
+      commands:
+        # Rename test to avoid 'select' module name clash
+        - mv ${SP_DIR}/um_utils/tests/select ${SP_DIR}/um_utils/tests/mule_select
+        - python -m unittest discover -vs ${SP_DIR}/um_utils/tests
+        - mule-convpp -h
+        - mule-cumf -h
+        - mule-cutout -h
+        - mule-editmask -h
+        - mule-fixframe -h
+        - mule-pumf -h
+        - mule-select -h
+        - mule-summary -h
+        - mule-trim -h
+        - mule-unpack -h
+        - mule-version -h
+    about:
+      summary: Series of specific utility tools for working with UM files.
+  
+  # Create the 'mule' metapackage
+  - name: mule
+    build:
+      skip: true # [not linux64]
+    requirements:
+      run:
+        - python
+        - numpy
+        - pillow
+        - shumlib
+        - six
+        - {{ pin_subpackage('um-spiral-search', exact=True) }}
+        - {{ pin_subpackage('um-packing', exact=True) }}
+        - {{ pin_subpackage('mule-base', exact=True) }}
+        - {{ pin_subpackage('um-ppibm', exact=True) }}
+        - {{ pin_subpackage('mule-utils', exact=True) }}
+
+about:
+  home: https://github.com/metomi/mule
+  license: BSD
+  license_family: BSD
+  summary: Mule is a Python API for accessing the various file types used by the UM; the UK Met Office's Unified Model.
+  extra:
+    git_hash: {{ environ["GIT_HASH"] }}

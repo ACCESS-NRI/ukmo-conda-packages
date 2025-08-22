@@ -1,0 +1,144 @@
+name: Check new releases
+# Check new releases of the packages inside the `packages/` directory from MOSRS.
+# If any package has a new release, it triggers the `release-package.yaml` workflow.
+
+on:
+  workflow_dispatch:
+  # Run the 1st of each month at 1:10am UK summer time (12:10am UK winter time)
+  schedule:
+    - cron: '10 0 1 * *'
+env:
+  RELEASE_WORKFLOW: release-package.yaml
+  RELEASE_ORDER: '["shumlib", "mule", "ants"]'
+  SVN_REALM: '<https://code.metoffice.gov.uk:443> Met Office Code'
+
+jobs:
+  get-packages:
+    name: Get packages name
+    runs-on: ubuntu-latest
+    outputs:
+      packages: ${{ steps.get-packages.outputs.packages }}
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+        with:
+            fetch-depth: 0
+        
+      - name: Get package names
+        id: get-packages
+        run: |
+          # Get package names from directories inside 'packages/'
+          packages=$(find ./packages -mindepth 1 -maxdepth 1 -type d -exec basename {} \; | tr '\n' ' ')
+          echo "packages=$packages" >> $GITHUB_OUTPUT
+
+  check-new-releases:
+    name: Check new releases
+    runs-on: ubuntu-latest
+    needs: get-packages
+    outputs:
+      release_json: ${{ steps.check-new-releases.outputs.release_json }}
+    env:
+      GH_TOKEN: ${{github.token}}
+    permissions:
+      actions: write
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+        with:
+          fetch-tags: true
+          fetch-depth: 0
+
+      - name: Cache SVN auth for MOSRS
+        uses: access-nri/actions/.github/actions/cache-svn-auth@main
+        with: 
+          username: '${{ secrets.MOSRS_USERNAME }}'
+          password: '${{ secrets.MOSRS_PASSWORD }}'
+          realm: '${{ env.SVN_REALM }}'
+    
+      - name: Check new releases
+        id: check-new-releases
+        run: |
+          # For each package, check if a new release on MOSRS is present
+          release_json=[]
+          for package in ${{ needs.get-packages.outputs.packages }}; do
+            echo "Checking new release for $package ..."
+            latest_prop=($(bash packages/$package/get-latest-mosrs-version.sh))
+            latest_version=${latest_prop[0]}
+            latest_revision=${latest_prop[1]}
+            # If a tag in the format '<PACKAGE-NAME>-<VERSION>' is not already present,
+            # add the latest version to the packages to release (release_json).
+            if [ -z "$(git tag -l $package-$latest_version)" ]; then
+              echo "Found new $package version on MOSRS:"
+              echo "  version: $latest_version"
+              echo "  revision: $latest_revision"
+              # if the package is 'ugants', we can release it directly, otherwise we add it to the json
+              # to be released in a chain (shumlib -> mule -> ants)
+              if [ "$package" == "ugants" ]; then
+                echo "Releasing ${package}-${latest_version} ..."
+                options="--field package_name=$package --field version=$latest_version --field revision=$latest_revision"
+                echo "Running '${{ env.RELEASE_WORKFLOW }}' workflow with the following options: '$options'"
+                gh workflow run ${{ env.RELEASE_WORKFLOW }} $options
+                # We wait for the GitHub database to be updated with the latest triggered run
+                # and then we get the its URL
+                sleep 2 
+                run_url=$(gh run list --workflow ${{ env.RELEASE_WORKFLOW }} --limit 1 --json url --jq '.[0].url')
+                echo "::notice::Releasing ${package}-${latest_version}. Release workflow run: $run_url"
+              else
+                json=$(
+                  jq -n --arg pkg "$package" --arg rev "$latest_revision" --arg ver "$latest_version" \
+                  '{package_name: $pkg, version: $ver, revision: $rev}'
+                )
+                release_json=$(jq -c --argjson json_obj "$json" '. += [$json_obj]' <<< "$release_json")
+                echo "Added ${package}-${latest_version} to the packages to be released."
+              fi
+            else
+              echo "Latest $package version on MOSRS ('$latest_version') is already released."
+            fi
+          done
+          if [[ $release_json != '[]' ]]; then
+            echo "New packages to be released: $release_json"
+          else
+            echo "No new packages to be released."
+          fi
+          # Use a multi-line github output to safely set the json array as a github output
+          echo 'release_json<<EOF' >> $GITHUB_OUTPUT
+          echo "$release_json" >> $GITHUB_OUTPUT
+          echo 'EOF' >> $GITHUB_OUTPUT
+
+  release-new-packages:
+    name: Release new packages
+    runs-on: ubuntu-latest
+    needs: check-new-releases
+    # Only run if there are new packages to release
+    if: ${{ needs.check-new-releases.outputs.release_json != '[]' }}
+    env:
+      GH_TOKEN: ${{github.token}}
+    permissions:
+      actions: write
+    steps:
+      - name: Order packages
+        id: order-packages
+        run: |
+          # Order packages to release in the correct order (shumlib -> mule -> ants)
+          release_json='${{ needs.check-new-releases.outputs.release_json }}'
+          ordered_json=$(
+            jq -c 'def custom_order: ${{ env.RELEASE_ORDER }}; 
+            sort_by(.package_name as $pkg | (custom_order | index($pkg)) // (custom_order | length))
+            ' <<< "$release_json"
+          )
+          # Use a multi-line github output to safely set the json array as a github output
+          echo 'ordered_json<<EOF' >> $GITHUB_OUTPUT
+          echo "$ordered_json" >> $GITHUB_OUTPUT
+          echo 'EOF' >> $GITHUB_OUTPUT
+
+      - name: Release packages
+        run: |
+          echo "Releasing packages ..."
+          options='--field release_json=${{ steps.order-packages.outputs.ordered_json }} --repo ${{ github.repository }}'
+          echo "Running '${{ env.RELEASE_WORKFLOW }}' workflow with the following options: '$options'"
+          gh workflow run ${{ env.RELEASE_WORKFLOW }} $options
+          # We wait for the GitHub database to be updated with the latest triggered run
+          # and then we get the its URL
+          sleep 2 
+          run_url=$(gh run list --workflow ${{ env.RELEASE_WORKFLOW }} --limit 1 --json url --jq '.[0].url' --repo ${{ github.repository }})
+          echo "::notice::Releasing the following packages: ${{ steps.order-packages.outputs.ordered_json }}. Release workflow run: $run_url"

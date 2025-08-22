@@ -1,0 +1,20 @@
+# Build package for multiple Python versions 
+python:
+  - 3.10
+  - 3.11
+  - 3.12
+
+numpy:
+  - 1.26 # py3.10
+  - 1.26 # py3.11
+  - 1.26 # py3.12
+
+# Binding numpy version to Python version (https://docs.conda.io/projects/conda-build/en/stable/resources/variants.html#special-variant-keys)
+zip_keys:
+  - python
+  - numpy
+
+# Binding runtime numpy and python to the ones used for builds (https://docs.conda.io/projects/conda-build/en/stable/resources/variants.html#special-variant-keys)
+pin_run_as_build:
+  python: x.x
+  numpy: x.x
