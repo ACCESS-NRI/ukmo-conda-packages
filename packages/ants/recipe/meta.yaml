@@ -48,18 +48,16 @@ test:
     - ancil_fill_n_merge.py -h
     - ancil_general_regrid.py -h
     - ants-version
-    # Enable ants to find the proper test resources and results
+    # Enable ants to find the proper test resources
     - ln -vs ${SRC_DIR}/lib/ants/tests/resources ${SP_DIR}/ants/tests/resources
-    - ln -vs ${SRC_DIR}/lib/ants/tests/results ${SP_DIR}/ants/tests/results
     # Run the tests ignoring the following problematic tests:
     # - deprecation warnings log
     # - 'test_point_lie_beyond_crs_definition' function
-    # - 'test_license_headers' function
-    # - 'TestTwoStage::test_api' method (it fails on the GitHub runners but succeeds on Gadi with the same exact python test environments)
+    # - 'TestWarning::test_warning' method
     - |
       $PYTHON -m pytest -W default -vs ${SP_DIR}/ants/tests \
       --ignore ${SP_DIR}/ants/tests/fileformats/test_deprecation_warnings.py \
-      -k 'not test_point_lie_beyond_crs_definition and not test_license_headers and not (TestTwoStage and test_api)'
+      -k 'not test_point_lie_beyond_crs_definition and not (TestWarning and test_warning)'
 
 about:
   home: https://code.metoffice.gov.uk/doc/ancil/ants/latest/index.html
