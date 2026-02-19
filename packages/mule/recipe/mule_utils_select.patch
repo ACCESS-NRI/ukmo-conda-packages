@@ -1,6 +1,7 @@
---- um_utils/lib/um_utils/select.py     2024-07-31 04:22:58.913175163 +0000
-+++ um_utils/lib/um_utils/select.py     2024-08-05 02:23:14.380718080 +0000
-@@ -183,6 +183,8 @@
+--- um_utils/lib/um_utils/select.py	2025-02-19 00:00:00.000000000 +0000
++++ um_utils/lib/um_utils/select.py	2025-02-19 00:00:00.000000000 +0000
+@@ -250,6 +250,8 @@
+     # There should be at least 4 arguments (i.e. the two filename plus one
      # include/exclude flag and a value for it)
      if len(sys.argv) < 4:
          parser.print_help()

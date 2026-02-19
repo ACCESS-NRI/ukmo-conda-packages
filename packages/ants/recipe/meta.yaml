@@ -1,13 +1,12 @@
 {% set name = "ants" %}
-{% set version = os.environ.get('VERSION') %}
 
 package:
   name: "{{ name|lower }}"
-  version: {{ version }}
+  version: {{ environ["VERSION"] }}
 
 source:
-  svn_url: https://code.metoffice.gov.uk/svn/ancil/ants/tags/{{ version }}
-  svn_rev: {{ environ["REVISION"] }}
+  git_url: https://github.com/MetOffice/ANTS.git
+  git_rev: {{ environ["VERSION"] }}
 
 build:
   number: 0
@@ -59,9 +58,9 @@ test:
       -k 'not test_point_lie_beyond_crs_definition and not (TestWarning and test_warning)'
 
 about:
-  home: https://code.metoffice.gov.uk/doc/ancil/ants/latest/index.html
+  home: https://github.com/MetOffice/ants
   license: BSD
-  license_family: BSD
+  license_file: LICENSE.txt
   summary: ANTS is a versatile Python library for developing ancillary applications.
   extra:
     git_hash: {{ environ["GIT_HASH"] }}

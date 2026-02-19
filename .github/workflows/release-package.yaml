@@ -6,16 +6,12 @@ on:
         description: "Name of the package to release"
         type: string
         required: false
-      revision:
-        description: "SVN revision associated with the package version to release"
-        type: number
-        required: false
       version:
         description: "Version of the package to release"
         type: string
         required: false
       release_json:
-        description: "JSON object containing information on the packages to be released (ordered by 'package_name')"
+        description: "JSON object containing information on the packages to be released (ordered by 'package_name')."
         type: string
         required: false
 env:
@@ -23,14 +19,13 @@ env:
 
 jobs:
   inputs-sanity-check:
-    # This workflow accepts either a single 'release_json' input, or the three 
-    # 'package_name', 'revision' and 'version' inputs (without 'release_json').
+    # This workflow accepts either a single 'release_json' input, or both 
+    # 'package_name' and 'version' inputs (without 'release_json').
     # Make sure that the inputs are valid before proceeding.
     name: Inputs sanity check
     runs-on: ubuntu-latest
     outputs:
       package_name: ${{ steps.check-inputs.outputs.package_name }}
-      revision: ${{ steps.check-inputs.outputs.revision }}
       version: ${{ steps.check-inputs.outputs.version }}
       release_json: ${{ steps.check-inputs.outputs.release_json }}
     steps:
@@ -39,36 +34,26 @@ jobs:
         run: |
           if [ -n '${{ inputs.release_json }}' ]; then
             # If release_json is not empty, then all the other inputs must be empty.
-            if (
-                [ -n '${{ inputs.package_name }}' ] \
-                || [ -n '${{ inputs.revision }}' ] \
-                || [ -n '${{ inputs.version }}' ] \
-            ); then
-              echo "::error:: 'release_json' cannot be specified together with any among 'package_name', 'revision' or 'version'." \
-                "Either a single 'release_json' input or the three 'package_name', 'revision' and 'version' inputs together must be specified."
+            if [[ '${{ inputs.package_name }}' != '' ]] || [[ '${{ inputs.version }}' != '' ]]; then
+              echo "::error:: 'release_json' cannot be specified together with 'package_name' or 'version'." \
+                "Either a single 'release_json' input or both 'package_name' and 'version' inputs must be specified."
               exit 1
             fi
             # Take the release information from the first object in release_json array
             package_name=$(jq -r '.[0].package_name' <<< '${{ inputs.release_json }}')
-            revision=$(jq -r '.[0].revision' <<< '${{ inputs.release_json }}')
             version=$(jq -r '.[0].version' <<< '${{ inputs.release_json }}')
             # Remove the first object from the release_json array
             release_json=$(jq -c '.[1:]' <<< '${{ inputs.release_json }}')
-          elif ( # If release_json is empty, then all the other inputs must be non-empty.
-                [ -z '${{ inputs.package_name }}' ] \
-                || [ -z '${{ inputs.revision }}' ] \
-                || [ -z '${{ inputs.version }}' ] \
-          ); then
-            echo "::error:: Not enough input arguments specified. Either a single 'release_json' input or the three 'package_name', 'revision' and 'version' inputs together must be specified."
+          elif [[ '${{ inputs.package_name }}' == '' ]] || [[ '${{ inputs.version }}' == '' ]]; then
+            echo "::error:: Not enough input arguments specified. Either a single 'release_json' input or " \
+              "both 'package_name' and 'version' inputs must be specified."
             exit 1
           else
             package_name='${{ inputs.package_name }}'
-            revision='${{ inputs.revision }}'
             version='${{ inputs.version }}'
             release_json='${{ inputs.release_json }}'
           fi
           echo "package_name=$package_name" >> $GITHUB_OUTPUT
-          echo "revision=$revision" >> $GITHUB_OUTPUT
           echo "version=$version" >> $GITHUB_OUTPUT
           echo "release_json=$release_json" >> $GITHUB_OUTPUT
           echo "::notice::Package to be released in this workflow: ${package_name}-${version}"
@@ -100,7 +85,6 @@ jobs:
     runs-on: ubuntu-latest
     needs: [inputs-sanity-check, set-tag-name]
     env:
-      REVISION: ${{ needs.inputs-sanity-check.outputs.revision }} # Needed as an env variable for the conda recipe
       VERSION: ${{ needs.inputs-sanity-check.outputs.version }} # Needed as an env variable for the conda recipe
       GIT_HASH: ${{ github.sha }} # Needed as an env variable for the conda recipe
     permissions:
@@ -108,13 +92,6 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-        
-      - name: Cache SVN auth for MOSRS
-        uses: access-nri/actions/.github/actions/cache-svn-auth@main
-        with: 
-          username: '${{ secrets.MOSRS_USERNAME }}'
-          password: '${{ secrets.MOSRS_PASSWORD }}'
-          realm: '<https://code.metoffice.gov.uk:443> Met Office Code'
       
       - name: Set up micromamba
         uses: mamba-org/setup-micromamba@b09ef9b599704322748535812ca03efb2625677b #v2.0.5

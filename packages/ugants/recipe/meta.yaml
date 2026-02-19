@@ -1,13 +1,12 @@
 {% set name = "ugants" %}
-{% set version = os.environ.get('VERSION') %}
 
 package:
   name: "{{ name|lower }}"
-  version: {{ version }}
+  version: {{ environ["VERSION"] }}
 
 source:
-  svn_url: https://code.metoffice.gov.uk/svn/ancil/ug-ants/tags/{{ version }}
-  svn_rev: {{ environ["REVISION"] }}
+  git_url: https://github.com/MetOffice/UG-ANTS.git
+  git_rev: {{ environ["VERSION"] }}
 
 build:
   number: 0
@@ -46,9 +45,9 @@ test:
     - $PYTHON -m pytest ${SP_DIR}/ugants/tests -W default
 
 about:
-  home: https://code.metoffice.gov.uk/doc/ancil/ug-ants/latest/contributing.html
+  home: https://github.com/MetOffice/UG-ANTS
   license: BSD
-  license_family: BSD
+  license_file: LICENSE.txt
   summary: UG-ANTS is a Python library to provide the capabilities to developing ancillary files on unstructured grids.
   extra:
     git_hash: {{ environ["GIT_HASH"] }}

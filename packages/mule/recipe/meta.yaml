@@ -5,8 +5,8 @@ package:
   version: {{ environ["VERSION"] }}
 
 source:
-  svn_url: https://code.metoffice.gov.uk/svn/um/mule/trunk
-  svn_rev: {{ environ["REVISION"] }}
+  git_url: https://github.com/MetOffice/mule.git
+  git_rev: {{ environ["VERSION"] }}
   patches:
     - um_ppibm_setup.patch
     - mule_utils_select.patch
@@ -185,9 +185,9 @@ outputs:
         - {{ pin_subpackage('mule-utils', exact=True) }}
 
 about:
-  home: https://github.com/metomi/mule
+  home: https://github.com/MetOffice/mule
   license: BSD
-  license_family: BSD
+  license_file: LICENSE
   summary: Mule is a Python API for accessing the various file types used by the UM; the UK Met Office's Unified Model.
   extra:
     git_hash: {{ environ["GIT_HASH"] }}

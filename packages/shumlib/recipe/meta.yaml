@@ -2,11 +2,11 @@
 
 package:
   name: "{{ name|lower }}"
-  version: '{{ environ["VERSION"] }}'
+  version: {{ environ["VERSION"] }}
 
 source:
-  svn_url: https://code.metoffice.gov.uk/svn/utils/shumlib/trunk
-  svn_rev: {{ environ["REVISION"] }}
+  git_url: https://github.com/MetOffice/mule.git
+  git_rev: {{ environ["VERSION"] }}
 
 build:
   number: 0
@@ -21,9 +21,9 @@ requirements:
     - sed
 
 about:
-  home: https://code.metoffice.gov.uk/trac/utils/shumlib
+  home: https://github.com/MetOffice/shumlib
   license: BSD
-  license_file: doc/README.rst
+  license_file: LICENSE
   summary: Unified Model Shared Libraries
   extra:
     git_hash: {{ environ["GIT_HASH"] }}
