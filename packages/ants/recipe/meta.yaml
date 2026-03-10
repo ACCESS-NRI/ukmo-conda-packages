@@ -47,6 +47,7 @@ test:
     - ancil_general_regrid.py -h
     - ants-version
     # Enable ants to find the proper test resources
+    - rm -rf ${SP_DIR}/ants/tests/resources
     - ln -vs ${SRC_DIR}/lib/ants/tests/resources ${SP_DIR}/ants/tests/resources
     # Run the tests ignoring the following problematic tests:
     # - deprecation warnings log

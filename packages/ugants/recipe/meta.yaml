@@ -42,6 +42,7 @@ test:
   commands:
     - ug-ants-version
     # Enable ugants to find the proper test resources
+    - rm -rf ${SP_DIR}/ugants/tests/resources
     - ln -vs ${SRC_DIR}/lib/ugants/tests/resources ${SP_DIR}/ugants/tests/resources
     # Test ugants
     - $PYTHON -m pytest ${SP_DIR}/ugants/tests -W default
