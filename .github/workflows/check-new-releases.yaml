@@ -52,7 +52,7 @@ jobs:
         id: check-new-releases
         run: |
           # For each package, check if a new release on the MetOffice
-          # GitHub organisation MOSRS is present
+          # GitHub organisation is present
           release_json=[]
           for package in ${{ needs.get-packages.outputs.packages }}; do
             echo "Checking new release for $package ..."
