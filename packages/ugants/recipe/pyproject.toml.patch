@@ -1,0 +1,11 @@
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@ -7,7 +7,7 @@ readme = "README.rst"
+ license = {file ="LICENSE.txt"}
+ # Updates to `requires-python` should have a corresponding update to the
+ # `environment.yml` file:
+-requires-python = "==3.10.13"
++requires-python = ">=3.10"
+ classifiers = [
+     "Programming Language :: Python :: 3",
+     "License :: OSI Approved :: BSD License",

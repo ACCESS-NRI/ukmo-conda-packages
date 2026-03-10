@@ -7,6 +7,8 @@ package:
 source:
   git_url: https://github.com/MetOffice/UG-ANTS.git
   git_rev: {{ environ["VERSION"] }}
+  patches:
+    - pyproject.toml.patch
 
 build:
   number: 0
