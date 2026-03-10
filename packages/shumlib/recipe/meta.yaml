@@ -5,7 +5,7 @@ package:
   version: {{ environ["VERSION"] }}
 
 source:
-  git_url: https://github.com/MetOffice/mule.git
+  git_url: https://github.com/MetOffice/shumlib.git
   git_rev: {{ environ["VERSION"] }}
 
 build:
