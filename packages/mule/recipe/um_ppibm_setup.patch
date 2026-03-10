@@ -1,8 +1,11 @@
---- um_ppibm/setup.py   2024-08-05 01:45:58.434007000 +0000
-+++ um_ppibm/setup.py   2024-08-05 01:46:15.405934457 +0000
-@@ -66,4 +66,5 @@
+--- a/um_ppibm/setup.py
++++ b/um_ppibm/setup.py
+@@ -66,7 +66,7 @@ setuptools.setup(
+             "um_ppibm.um_ieee2ibm32",
+             ["lib/um_ppibm/um_ieee2ibm32.c"],
              include_dirs=[np.get_include()],
-             libraries=["shum_string_conv",
-                        "shum_byteswap",
-+                       "shum_string_conv",
-                        "shum_data_conv"])])
+-            libraries=["shum_string_conv", "shum_byteswap", "shum_data_conv"],
++            libraries=["shum_string_conv", "shum_byteswap", "shum_string_conv","shum_data_conv"],
+         )
+     ],
+ )

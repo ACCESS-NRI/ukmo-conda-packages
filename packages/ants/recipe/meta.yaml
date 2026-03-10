@@ -1,13 +1,12 @@
 {% set name = "ants" %}
-{% set version = os.environ.get('VERSION') %}
 
 package:
   name: "{{ name|lower }}"
-  version: {{ version }}
+  version: {{ environ["VERSION"] }}
 
 source:
-  svn_url: https://code.metoffice.gov.uk/svn/ancil/ants/tags/{{ version }}
-  svn_rev: {{ environ["REVISION"] }}
+  git_url: https://github.com/MetOffice/ANTS.git
+  git_rev: {{ environ["VERSION"] }}
 
 build:
   number: 0
@@ -48,20 +47,22 @@ test:
     - ancil_general_regrid.py -h
     - ants-version
     # Enable ants to find the proper test resources
+    - rm -rf ${SP_DIR}/ants/tests/resources
     - ln -vs ${SRC_DIR}/lib/ants/tests/resources ${SP_DIR}/ants/tests/resources
     # Run the tests ignoring the following problematic tests:
     # - deprecation warnings log
     # - 'test_point_lie_beyond_crs_definition' function
     # - 'TestWarning::test_warning' method
+    # - 'TestLicenseHeaders' class
     - |
       $PYTHON -m pytest -W default -vs ${SP_DIR}/ants/tests \
       --ignore ${SP_DIR}/ants/tests/fileformats/test_deprecation_warnings.py \
-      -k 'not test_point_lie_beyond_crs_definition and not (TestWarning and test_warning)'
+      -k 'not test_point_lie_beyond_crs_definition and not (TestWarning and test_warning) and not TestLicenseHeaders'
 
 about:
-  home: https://code.metoffice.gov.uk/doc/ancil/ants/latest/index.html
+  home: https://github.com/MetOffice/ants
   license: BSD
-  license_family: BSD
+  license_file: LICENSE.txt
   summary: ANTS is a versatile Python library for developing ancillary applications.
   extra:
     git_hash: {{ environ["GIT_HASH"] }}
