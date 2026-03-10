@@ -81,7 +81,7 @@ jobs:
           echo "release_name=${{ needs.inputs-sanity-check.outputs.package_name }} ${{ needs.inputs-sanity-check.outputs.version }}" >> $GITHUB_OUTPUT
 
   release-conda-package:
-    name: Create conda package
+    name: Create '${{ needs.set-tag-name.outputs.release_name }}' conda package
     runs-on: ubuntu-latest
     needs: [inputs-sanity-check, set-tag-name]
     env:
