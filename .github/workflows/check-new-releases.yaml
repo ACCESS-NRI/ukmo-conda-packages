@@ -10,7 +10,6 @@ on:
 env:
   RELEASE_WORKFLOW: release-package.yaml
   RELEASE_ORDER: '["shumlib", "mule", "ants"]'
-  SVN_REALM: '<https://code.metoffice.gov.uk:443> Met Office Code'
 
 jobs:
   get-packages:
