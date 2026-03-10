@@ -23,7 +23,7 @@ requirements:
 about:
   home: https://github.com/MetOffice/shumlib
   license: BSD
-  license_file: LICENSE
+  license_file: LICENCE
   summary: Unified Model Shared Libraries
   extra:
     git_hash: {{ environ["GIT_HASH"] }}

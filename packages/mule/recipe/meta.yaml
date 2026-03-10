@@ -187,7 +187,7 @@ outputs:
 about:
   home: https://github.com/MetOffice/mule
   license: BSD
-  license_file: LICENSE
+  license_file: LICENCE
   summary: Mule is a Python API for accessing the various file types used by the UM; the UK Met Office's Unified Model.
   extra:
     git_hash: {{ environ["GIT_HASH"] }}
