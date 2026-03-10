@@ -189,4 +189,4 @@ jobs:
           topic: "ukmo-conda-packages"
           content: |
             The release of `${{ needs.set-tag-name.outputs.release_name }}` conda package failed.
-            For details, see https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+            For details, see ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
