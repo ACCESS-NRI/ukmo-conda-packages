@@ -79,7 +79,7 @@ jobs:
                 echo "Releasing '${package}-${latest_version}' ..."
                 options="--field package_name=$package --field version=$latest_version"
                 echo "Running '${{ env.RELEASE_WORKFLOW }}' workflow with the following options: '$options'"
-                gh workflow run ${{ env.RELEASE_WORKFLOW }} $options
+                gh workflow run ${{ env.RELEASE_WORKFLOW }} $options --ref ${{ github.ref }}
                 # We wait for the GitHub database to be updated with the latest triggered run
                 # and then we get the its URL
                 sleep 2 
@@ -134,7 +134,7 @@ jobs:
           echo "Releasing packages ..."
           options='--field release_json=${{ steps.order-packages.outputs.ordered_json }} --repo ${{ github.repository }}'
           echo "Running '${{ env.RELEASE_WORKFLOW }}' workflow with the following options: '$options'"
-          gh workflow run '${{ env.RELEASE_WORKFLOW }}' $options
+          gh workflow run '${{ env.RELEASE_WORKFLOW }}' $options --ref ${{ github.ref }}
           # We wait for the GitHub database to be updated with the latest triggered run
           # and then we get the its URL
           sleep 2 
