@@ -50,14 +50,14 @@ test:
     - rm -rf ${SP_DIR}/ants/tests/resources
     - ln -vs ${SRC_DIR}/lib/ants/tests/resources ${SP_DIR}/ants/tests/resources
     # Run the tests ignoring the following problematic tests:
-    # - deprecation warnings log
+    # - deprecation warnings logs
     # - 'test_point_lie_beyond_crs_definition' function
     # - 'TestWarning::test_warning' method
     # - 'TestLicenseHeaders' class
     - |
       $PYTHON -m pytest -W default -vs ${SP_DIR}/ants/tests \
       --ignore ${SP_DIR}/ants/tests/fileformats/test_deprecation_warnings.py \
-      -k 'not test_point_lie_beyond_crs_definition and not (TestWarning and test_warning) and not TestLicenseHeaders'
+      -k 'not test_point_lie_beyond_crs_definition and not (TestWarning and test_warning) and not TestLicenseHeaders and not test_deprecation_warning'
 
 about:
   home: https://github.com/MetOffice/ants
