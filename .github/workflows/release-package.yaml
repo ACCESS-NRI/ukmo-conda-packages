@@ -91,7 +91,7 @@ jobs:
       contents: write
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       
       - name: Set up micromamba
         uses: mamba-org/setup-micromamba@b09ef9b599704322748535812ca03efb2625677b #v2.0.5
@@ -158,7 +158,7 @@ jobs:
       GH_TOKEN: ${{ github.token }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-tags: true
       
