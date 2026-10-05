@@ -69,7 +69,10 @@ jobs:
           else
             echo "::notice::Packages queued for release: $release_json"
           fi
-            
+          if [ ${{ inputs.test }} == 'true' ]; then
+            echo "::notice::Test mode enabled. The package will not be uploaded."
+          fi
+
   set-tag-name:
     name: Set tag name and release name
     runs-on: ubuntu-latest
