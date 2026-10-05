@@ -91,16 +91,16 @@ jobs:
       contents: write
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
       
       - name: Set up micromamba
-        uses: mamba-org/setup-micromamba@b09ef9b599704322748535812ca03efb2625677b #v2.0.5
+        uses: mamba-org/setup-micromamba@f457c30a868e4760d3a6fcea5f25dc655b8edf39 #v3.2.1
         with:
           environment-file: env-build.yml
 
       - name: Build and upload conda package
         id: conda-build
-        uses: ACCESS-NRI/action-build-and-upload-conda-packages@v3.0.0
+        uses: ACCESS-NRI/action-build-and-upload-conda-packages@v3.1.0
         with:
           meta_yaml_dir: packages/${{ needs.inputs-sanity-check.outputs.package_name }}/recipe
           user: ${{ secrets.ANACONDA_USERNAME }}

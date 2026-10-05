@@ -1,0 +1,33 @@
+name: Keepalive
+description: |
+  Keep this repository active by creating a dummy empty commit
+on:
+  workflow_call:
+env:
+  COMMIT_MESSAGE: keepalive
+  MAX_AGE_DAYS: 28
+jobs:
+  keepalive:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 2
+      - run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # If latest commit is a keepalive empty commit, amend it and force-push,
+          # otherwise only create a keepalive empty commit if the latest commit is
+          # older than MAX_AGE_DAYS
+          if [ "$(git log -1 --format=%s)" = "$COMMIT_MESSAGE" ]; then
+            git commit --amend --allow-empty --no-edit --reset-author
+            git push --force-with-lease
+          else
+            age_days=$(( ( $(date +%s) - $(git log -1 --format=%ct) ) / 86400 ))
+            if [ "$age_days" -gt "$MAX_AGE_DAYS" ]; then
+              git commit --allow-empty -m "$COMMIT_MESSAGE"
+              git push
+            fi
+          fi
