@@ -14,6 +14,13 @@ on:
         description: "JSON object containing information on the packages to be released (ordered by 'package_name')."
         type: string
         required: false
+      test:
+        description: |
+          Only perform a conda build test of the package version, without uploading
+          the conda package on Anaonda.org or adding a tag and GitHub release.
+        type: boolean
+        default: false
+        required: false
 env:
   RELEASE_WORKFLOW: release-package.yaml
 
@@ -105,16 +112,19 @@ jobs:
           meta_yaml_dir: packages/${{ needs.inputs-sanity-check.outputs.package_name }}/recipe
           user: ${{ secrets.ANACONDA_USERNAME }}
           token: ${{ secrets.ANACONDA_TOKEN }}
+          upload: ${{ ! inputs.test }}
           conda_build_args: -c accessnri -c conda-forge -c nodefaults
     
       - name: Create tag
         id: create-tag
+        if: ${{ ! inputs.test }}
         run: |
           # Create tag
           git tag '${{ needs.set-tag-name.outputs.tag_name }}' ${{ github.sha }}
           git push origin tag '${{ needs.set-tag-name.outputs.tag_name }}'
 
       - name: Create Release
+        if: ${{ ! inputs.test }}
         uses: softprops/action-gh-release@72f2c25fcb47643c292f7107632f7a47c1df5cd8 #v2.3.2
         with:
           tag_name: '${{ needs.set-tag-name.outputs.tag_name }}'
@@ -128,7 +138,7 @@ jobs:
     name: Release queued packages
     runs-on: ubuntu-latest
     needs: [inputs-sanity-check, release-conda-package]
-    if: ${{ needs.inputs-sanity-check.outputs.release_json != '' && needs.inputs-sanity-check.outputs.release_json != '[]' }}
+    if: ${{ ! inputs.test && needs.inputs-sanity-check.outputs.release_json != '' && needs.inputs-sanity-check.outputs.release_json != '[]' }}
     env:
       GH_TOKEN: ${{github.token}}
     permissions:
@@ -151,14 +161,14 @@ jobs:
     runs-on: ubuntu-latest
     needs: [set-tag-name, release-conda-package]
     # Run this job if any of the previous jobs failed (and don't skip if any of the needed jobs is skipped)
-    if: ${{ ( always() && failure() ) || cancelled() }}
+    if: ${{ ! inputs.test && (( always() && failure() ) || cancelled() ) }}
     permissions:
       contents: write
     env:
       GH_TOKEN: ${{ github.token }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           fetch-tags: true
       
