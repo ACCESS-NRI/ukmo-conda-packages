@@ -143,4 +143,6 @@ jobs:
   keepalive:
     name: Keepalive
     needs: [check-new-releases]
+    permissions:
+      contents: write
     uses: ./.github/workflows/keepalive.yaml
