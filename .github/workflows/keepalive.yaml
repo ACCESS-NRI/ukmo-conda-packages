@@ -1,6 +1,5 @@
 name: Keepalive
-description: |
-  Keep this repository active by creating a dummy empty commit
+# Keep this repository active by creating a dummy empty commit.
 on:
   workflow_call:
 env:
@@ -31,6 +30,5 @@ jobs:
               git push
             else
               echo '::notice::Latest commit is recent. No keepalive commit was added.'
-            fi
             fi
           fi
