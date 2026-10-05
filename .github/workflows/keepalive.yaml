@@ -29,5 +29,8 @@ jobs:
             if [ "$age_days" -gt "$MAX_AGE_DAYS" ]; then
               git commit --allow-empty -m "$COMMIT_MESSAGE"
               git push
+            else
+              echo '::notice::Latest commit is recent. No keepalive commit was added.'
+            fi
             fi
           fi
