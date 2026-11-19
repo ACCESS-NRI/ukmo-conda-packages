@@ -5,71 +5,58 @@ on:
       package_name:
         description: "Name of the package to release"
         type: string
-        required: false
+        required: true
       version:
         description: "Version of the package to release"
         type: string
-        required: false
-      release_json:
-        description: "JSON object containing information on the packages to be released (ordered by 'package_name')."
-        type: string
-        required: false
+        required: true
       test:
         description: |
           Only perform a conda build test of the package version, without uploading
-          the conda package on Anaonda.org or adding a tag and GitHub release.
+          the conda package on Anaconda.org or adding a tag and GitHub release.
         type: boolean
         default: false
         required: false
+  workflow_call:
+    inputs:
+      package_name:
+        description: "Name of the package to release"
+        type: string
+        required: true
+      version:
+        description: "Version of the package to release"
+        type: string
+        required: true
 env:
   RELEASE_WORKFLOW: release-package.yaml
 
 jobs:
   inputs-sanity-check:
-    # This workflow accepts either a single 'release_json' input, or both 
-    # 'package_name' and 'version' inputs (without 'release_json').
-    # Make sure that the inputs are valid before proceeding.
     name: Inputs sanity check
     runs-on: ubuntu-latest
     outputs:
       package_name: ${{ steps.check-inputs.outputs.package_name }}
       version: ${{ steps.check-inputs.outputs.version }}
       release_json: ${{ steps.check-inputs.outputs.release_json }}
+    env:
+      NAME: ${{ inputs.package_name }}
+      VERSION: ${{ inputs.version }}
+      IS_TEST: ${{ inputs.test }}
     steps:
       - name: Check inputs
         id: check-inputs
         run: |
-          if [ -n '${{ inputs.release_json }}' ]; then
-            # If release_json is not empty, then all the other inputs must be empty.
-            if [[ '${{ inputs.package_name }}' != '' ]] || [[ '${{ inputs.version }}' != '' ]]; then
-              echo "::error:: 'release_json' cannot be specified together with 'package_name' or 'version'." \
-                "Either a single 'release_json' input or both 'package_name' and 'version' inputs must be specified."
-              exit 1
-            fi
-            # Take the release information from the first object in release_json array
-            package_name=$(jq -r '.[0].package_name' <<< '${{ inputs.release_json }}')
-            version=$(jq -r '.[0].version' <<< '${{ inputs.release_json }}')
-            # Remove the first object from the release_json array
-            release_json=$(jq -c '.[1:]' <<< '${{ inputs.release_json }}')
-          elif [[ '${{ inputs.package_name }}' == '' ]] || [[ '${{ inputs.version }}' == '' ]]; then
-            echo "::error:: Not enough input arguments specified. Either a single 'release_json' input or " \
-              "both 'package_name' and 'version' inputs must be specified."
+          if [ -z "$NAME" ]; then
+            echo "::error:: Empty 'package_name' found. 'package_name' needs to be non-empty."
             exit 1
-          else
-            package_name='${{ inputs.package_name }}'
-            version='${{ inputs.version }}'
-            release_json='${{ inputs.release_json }}'
+          elif [ -z "$VERSION" ]; then
+            echo "::error:: Empty 'version' found. 'version' needs to be non-empty."
+            exit 1
           fi
-          echo "package_name=$package_name" >> $GITHUB_OUTPUT
-          echo "version=$version" >> $GITHUB_OUTPUT
-          echo "release_json=$release_json" >> $GITHUB_OUTPUT
-          echo "::notice::Package to be released in this workflow: ${package_name}-${version}"
-          if [ $release_json == '' ] || [ $release_json == '[]' ]; then
-            echo "::notice::No other packages queued for release."
-          else
-            echo "::notice::Packages queued for release: $release_json"
-          fi
-          if [ ${{ inputs.test }} == 'true' ]; then
+          echo "package_name=$NAME" >> $GITHUB_OUTPUT
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "::notice::Package to be released in this workflow: ${NAME}-${VERSION}"
+          if [[ "$IS_TEST" == true ]]; then
             echo "::notice::Test mode enabled. The package will not be uploaded."
           fi
 
@@ -80,18 +67,20 @@ jobs:
     outputs:
       tag_name: ${{ steps.set-tag.outputs.tag_name }}
       release_name: ${{ steps.set-release.outputs.release_name }}
+    env:
+      NAME: ${{ needs.inputs-sanity-check.outputs.package_name }}
+      VERSION: ${{ needs.inputs-sanity-check.outputs.version }}
     steps:
       - name: Set tag name
         id: set-tag
-        run: |
-          echo "tag_name=${{ needs.inputs-sanity-check.outputs.package_name }}-${{ needs.inputs-sanity-check.outputs.version }}" >> $GITHUB_OUTPUT
+        run: echo "tag_name=${NAME}-${VERSION}" >> $GITHUB_OUTPUT
+
       - name: Set release name
         id: set-release
-        run: |
-          echo "release_name=${{ needs.inputs-sanity-check.outputs.package_name }} ${{ needs.inputs-sanity-check.outputs.version }}" >> $GITHUB_OUTPUT
+        run: echo "release_name=${NAME} ${VERSION}" >> $GITHUB_OUTPUT
 
   release-conda-package:
-    name: Create '${{ needs.set-tag-name.outputs.release_name }}' conda package
+    name: Release ${{ needs.set-tag-name.outputs.release_name }} conda package
     runs-on: ubuntu-latest
     needs: [inputs-sanity-check, set-tag-name]
     env:
@@ -136,70 +125,3 @@ jobs:
           fail_on_unmatched_files: true
           files: |-
             ${{ steps.conda-build.outputs.paths }}
-  
-  release-queued-packages:
-    name: Release queued packages
-    runs-on: ubuntu-latest
-    needs: [inputs-sanity-check, release-conda-package]
-    if: ${{ ! inputs.test && needs.inputs-sanity-check.outputs.release_json != '' && needs.inputs-sanity-check.outputs.release_json != '[]' }}
-    env:
-      GH_TOKEN: ${{github.token}}
-    permissions:
-      actions: write
-    steps:
-      - name: Release packages
-        run: |
-          echo "Releasing packages ..."
-          options='--field release_json=${{ needs.inputs-sanity-check.outputs.release_json }} --repo ${{ github.repository }}'
-          echo "Running '${{ env.RELEASE_WORKFLOW }}' workflow with the following options: '$options'"
-          gh workflow run ${{ env.RELEASE_WORKFLOW }} $options --ref ${{ github.ref }}
-          # We wait for the GitHub database to be updated with the latest triggered run
-          # and then we get the its URL
-          sleep 2 
-          run_url=$(gh run list --workflow ${{ env.RELEASE_WORKFLOW }} --limit 1 --json url --jq '.[0].url' --repo ${{ github.repository }})
-          echo "::notice::Releasing the following packages: ${{ needs.inputs-sanity-check.outputs.release_json }}. Release workflow run: $run_url"
-
-  cleanup-on-failure:
-    name: Cleanup on failure
-    runs-on: ubuntu-latest
-    needs: [set-tag-name, release-conda-package]
-    # Run this job if any of the previous jobs failed (and don't skip if any of the needed jobs is skipped)
-    if: ${{ ! inputs.test && (( always() && failure() ) || cancelled() ) }}
-    permissions:
-      contents: write
-    env:
-      GH_TOKEN: ${{ github.token }}
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v7
-        with:
-          fetch-tags: true
-      
-      # Delete newly created tag
-      - name: Cleanup tag
-        run: |
-          if git rev-parse '${{ needs.set-tag-name.outputs.tag_name }}' &>/dev/null; then
-              git push origin ':${{ needs.set-tag-name.outputs.tag_name }}'
-              echo "A job in the current workflow failed. Tag '${{ needs.set-tag-name.outputs.tag_name }}' was deleted."
-          fi
-      
-      # Delete newly created GitHub release
-      - name: Cleanup GitHub release
-        run: |
-           gh release delete '${{ needs.set-tag-name.outputs.tag_name }}'
-    
-      # Send alert to Zulip if the release failed
-      - name: Send alert to Zulip
-        # Don't send alert if the workflow was cancelled
-        if: ${{ ! cancelled() }}
-        uses: zulip/github-actions-zulip/send-message@e4c8f27c732ba9bd98ac6be0583096dea82feea5 # v1.0.2
-        with:
-          api-key: ${{ secrets.ZULIP_API_KEY }}
-          email: ${{ secrets.ZULIP_EMAIL }}
-          organization-url: ${{ vars.ZULIP_ORG_URL }}
-          type: stream
-          to: model-release
-          topic: "ukmo-conda-packages"
-          content: |
-            The release of `${{ needs.set-tag-name.outputs.release_name }}` conda package failed.
-            For details, see ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}

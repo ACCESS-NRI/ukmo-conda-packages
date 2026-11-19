@@ -4,8 +4,8 @@ This repository automates the packaging and distribution of selected [UK Met Off
 The built packages are distributed on the [accessnri Anaconda channel](https://anaconda.org/accessnri).
 
 ## Available packages
-- [`shumlib`](https://anaconda.org/accessnri/shumlib)
-- [`mule`](https://anaconda.org/accessnri/mule)
+- ~~[`shumlib`](https://anaconda.org/accessnri/shumlib)~~ (Now on [conda-forge](https://anaconda.org/channels/conda-forge/packages/shumlib/overview))
+- ~~[`mule`](https://anaconda.org/accessnri/mule)~~ (Now on [conda-forge](https://anaconda.org/channels/conda-forge/packages/mule/overview))
 - [`ants`](https://anaconda.org/accessnri/ants)
 - [`ugants`](https://anaconda.org/accessnri/ugants)
 

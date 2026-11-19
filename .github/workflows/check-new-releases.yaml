@@ -9,10 +9,9 @@ on:
     - cron: '10 0 1 * *'
 env:
   RELEASE_WORKFLOW: release-package.yaml
-  RELEASE_ORDER: '["shumlib", "mule", "ants"]'
 
 jobs:
-  get-packages:
+  get-packages-names:
     name: Get packages name
     runs-on: ubuntu-latest
     outputs:
@@ -20,8 +19,6 @@ jobs:
     steps:
       - name: Checkout source
         uses: actions/checkout@v7
-        with:
-            fetch-depth: 0
         
       - name: Get package names
         id: get-packages
@@ -29,11 +26,12 @@ jobs:
           # Get package names from directories inside 'packages/'
           packages=$(find ./packages -mindepth 1 -maxdepth 1 -type d -exec basename {} \; | tr '\n' ' ')
           echo "packages=$packages" >> $GITHUB_OUTPUT
+          echo "::notice::Found packages: $packages"
 
-  check-new-releases:
-    name: Check new releases
+  get-packages-to-release:
+    name: Get new packages to be released
     runs-on: ubuntu-latest
-    needs: get-packages
+    needs: get-packages-names
     outputs:
       release_json: ${{ steps.check-new-releases.outputs.release_json }}
     env:
@@ -53,7 +51,7 @@ jobs:
           # For each package, check if a new release on the MetOffice
           # GitHub organisation is present
           release_json=[]
-          for package in ${{ needs.get-packages.outputs.packages }}; do
+          for package in ${{ needs.get-packages-names.outputs.packages }}; do
             echo "Checking new release for $package ..."
             github_repo_url=$(
               cat "./packages/$package/recipe/meta.yaml" \
@@ -72,77 +70,44 @@ jobs:
             # add the latest version to the packages to release (release_json).
             if [ -z "$(git tag -l "${package}-${latest_version}")" ]; then
               echo "Found new '$package' version: $latest_version"
-              # if the package is 'ugants', we can release it directly, otherwise we add it to the json
-              # to be released in a chain of dependencies (shumlib -> mule -> ants)
-              if [ "$package" == "ugants" ]; then
-                echo "Releasing '${package}-${latest_version}' ..."
-                options="--field package_name=$package --field version=$latest_version"
-                echo "Running '${{ env.RELEASE_WORKFLOW }}' workflow with the following options: '$options'"
-                gh workflow run ${{ env.RELEASE_WORKFLOW }} $options --ref ${{ github.ref }}
-                # We wait for the GitHub database to be updated with the latest triggered run
-                # and then we get the its URL
-                sleep 2 
-                run_url=$(gh run list --workflow ${{ env.RELEASE_WORKFLOW }} --limit 1 --json url --jq '.[0].url')
-                echo "::notice::Releasing '${package}-${latest_version}'. Release workflow run: $run_url"
-              else
-                json=$(
-                  jq -cn --arg pkg "$package" --arg ver "$latest_version" \
-                  '{package_name: $pkg, version: $ver}'
-                )
-                release_json=$(jq -c --argjson json_obj "$json" '. += [$json_obj]' <<< "$release_json")
-                echo "Added '${package}-${latest_version}' to the packages to be released."
-              fi
+              json=$(
+                jq -cn --arg pkg "$package" --arg ver "$latest_version" \
+                '{package_name: $pkg, version: $ver}'
+              )
+              release_json=$(jq -c --argjson json_obj "$json" '. += [$json_obj]' <<< "$release_json")
+              echo "Added '${package}-${latest_version}' to the packages to be released."
             else
               echo "Latest $package version on GitHub ('$latest_version') is already released."
             fi
           done
           if [[ $release_json != '[]' ]]; then
-            echo "New packages to be released: $release_json"
+            echo "::notice::New packages to be released: $release_json"
           else
-            echo "No new packages to be released."
+            echo "::notice::No new packages to be released."
           fi
           # Set the release_json as a GitHub output to be used in the next job
           echo "release_json=$release_json" >> $GITHUB_OUTPUT
 
   release-new-packages:
     name: Release new packages
-    runs-on: ubuntu-latest
-    needs: check-new-releases
+    needs: get-packages-to-release
     # Only run if there are new packages to release
-    if: needs.check-new-releases.outputs.release_json != '[]'
-    env:
-      GH_TOKEN: ${{ github.token }}
+    if: needs.get-packages-to-release.outputs.release_json != '[]'
+    strategy:
+      matrix:
+        package: ${{ fromJSON(needs.get-packages-to-release.outputs.release_json) }}
+      fail-fast: false
+    uses: $/.github/workflows/release-package.yaml
+    with:
+      package_name: ${{ matrix.package.package_name }}
+      version: ${{ matrix.package.version }}
     permissions:
-      actions: write
-    steps:
-      - name: Order packages
-        id: order-packages
-        run: |
-          # Order packages to release in the correct order (shumlib -> mule -> ants)
-          release_json='${{ needs.check-new-releases.outputs.release_json }}'
-          ordered_json=$(
-            jq -c --argjson order '${{ env.RELEASE_ORDER }}' \
-              'sort_by(.package_name as $pkg | ($order | index($pkg)) // ($order | length))' \
-              <<< "$release_json"
-          )
-          # Set the json array as a github output
-          echo "ordered_json=$ordered_json" >> $GITHUB_OUTPUT
-
-      - name: Release packages
-        run: |
-          echo "Releasing packages ..."
-          options='--field release_json=${{ steps.order-packages.outputs.ordered_json }} --repo ${{ github.repository }}'
-          echo "Running '${{ env.RELEASE_WORKFLOW }}' workflow with the following options: '$options'"
-          gh workflow run '${{ env.RELEASE_WORKFLOW }}' $options --ref ${{ github.ref }}
-          # We wait for the GitHub database to be updated with the latest triggered run
-          # and then we get the its URL
-          sleep 2 
-          run_url=$(gh run list --workflow ${{ env.RELEASE_WORKFLOW }} --limit 1 --json url --jq '.[0].url' --repo ${{ github.repository }})
-          echo "::notice::Releasing the following packages: ${{ steps.order-packages.outputs.ordered_json }}. Release workflow run: $run_url"
+      contents: write
 
   keepalive:
     name: Keepalive
-    needs: [check-new-releases]
+    needs: release-new-packages
+    if: ${{ !cancelled() && !failure() }}
     permissions:
       contents: write
-    uses: ./.github/workflows/keepalive.yaml
+    uses: $/.github/workflows/keepalive.yaml

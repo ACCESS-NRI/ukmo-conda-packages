@@ -1,5 +1,6 @@
 name: Keepalive
-# Keep this repository active by creating a dummy empty commit.
+# Create a dummy empty commit to keep this repository active, so that it can continue
+# checking for new releases.
 on:
   workflow_call:
 env:
